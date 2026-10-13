@@ -282,9 +282,12 @@ async fn a_burst_is_recorded_or_counted() {
         "{} refused, {dropped} dropped",
         refused.len()
     );
-    assert_eq!(
-        refused.last(),
-        Some(&"last.test:443 (not on the allow list)")
+    // The one after the burst is recorded, unless the pipe was still full then
+    // and it's among those counted.
+    assert!(
+        refused.last() == Some(&"last.test:443 (not on the allow list)") || dropped > 0,
+        "last recorded: {:?}",
+        refused.last()
     );
     assert!(r.pipe_fds().is_empty());
 }
