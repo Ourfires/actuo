@@ -398,7 +398,8 @@ pub fn read_records(
                     .append(true)
                     .open(path)
             {
-                let _ = writeln!(f, "{} {text}", crate::time::now());
+                // One write: other processes append to the same file.
+                let _ = f.write_all(format!("{} {text}\n", crate::time::now()).as_bytes());
             }
         };
         // Bytes, not `lines()`: a line that isn't UTF-8 is dropped, not the end.

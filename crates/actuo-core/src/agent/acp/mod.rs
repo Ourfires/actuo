@@ -138,7 +138,8 @@ impl AgentBackend for AcpBackend {
                             .open(path)
                     {
                         use std::io::Write;
-                        let _ = writeln!(f, "{text}");
+                        // One write: the agent's stderr goes to the same file.
+                        let _ = f.write_all(format!("{text}\n").as_bytes());
                     }
                     let mut tail = shared.stderr_tail.lock().unwrap();
                     tail.extend(text.as_bytes());

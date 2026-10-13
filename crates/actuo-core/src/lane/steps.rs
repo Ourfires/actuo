@@ -272,7 +272,8 @@ pub async fn run(
         let sink = Some(refused.clone());
         crate::sandbox::read_records(reader, srt.refusal_log, srt.label, sink, move |text| {
             use std::io::Write;
-            let _ = writeln!(out, "{text}");
+            // One write, so the command's output can't land inside the line.
+            let _ = out.write_all(format!("{text}\n").as_bytes());
         });
     }
     let pid = child.id().unwrap_or_default();
