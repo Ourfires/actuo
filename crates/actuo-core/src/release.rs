@@ -73,6 +73,49 @@ pub async fn is_release(commit: &str) -> bool {
     }
 }
 
+/// Downloads `url` to `to` with `curl` (10 min at most).
+pub fn download(url: &str, to: &std::path::Path) -> Result<(), String> {
+    let out = crate::process::output_std(
+        std::process::Command::new("curl")
+            .args(["-fsSL", "--max-time", "600", "-o"])
+            .arg(to)
+            .arg(url),
+    )
+    .map_err(|e| format!("running curl: {e}"))?;
+    if !out.status.success() {
+        return Err(format!(
+            "downloading {url}: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(())
+}
+
+/// A file's sha256, with `sha256sum` (Linux) or `shasum -a 256` (macOS), as
+/// `install.sh` does.
+pub fn sha256(file: &std::path::Path) -> Result<String, String> {
+    use std::process::Command;
+    let out = match crate::process::output_std(Command::new("sha256sum").arg(file)) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            crate::process::output_std(Command::new("shasum").args(["-a", "256"]).arg(file))
+        }
+        out => out,
+    }
+    .map_err(|e| format!("computing {}'s sha256: {e}", file.display()))?;
+    if !out.status.success() {
+        return Err(format!(
+            "computing {}'s sha256: {}",
+            file.display(),
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .next()
+        .unwrap_or_default()
+        .to_string())
+}
+
 /// `curl -fsSL`, 10 s at most; the body as text.
 async fn get(url: &str) -> Result<String, String> {
     let out = crate::process::output(tokio::process::Command::new("curl").args([
