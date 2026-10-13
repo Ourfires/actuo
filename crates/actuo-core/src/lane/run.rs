@@ -830,7 +830,10 @@ impl RunTask {
                 return Err(self
                     .fail(
                         "auth_required",
-                        "The agent needs a login: log in with the agent's own CLI.",
+                        &format!(
+                            "The agent needs a login for lane runs: on actuo's machine, run `actuo login {}`.",
+                            self.run.agent
+                        ),
                     )
                     .await);
             }
@@ -1020,7 +1023,10 @@ impl RunTask {
                     return Err(self
                         .fail(
                             "auth_required",
-                            "The agent needs a login: log in with the agent's own CLI.",
+                            &format!(
+                            "The agent needs a login for lane runs: on actuo's machine, run `actuo login {}`.",
+                            self.run.agent
+                        ),
                         )
                         .await);
                 }
@@ -1059,7 +1065,10 @@ impl RunTask {
                 return Err(self
                     .fail(
                         "auth_required",
-                        "The agent needs a login: log in with the agent's own CLI.",
+                        &format!(
+                            "The agent needs a login for lane runs: on actuo's machine, run `actuo login {}`.",
+                            self.run.agent
+                        ),
                     )
                     .await);
             }

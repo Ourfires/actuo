@@ -376,7 +376,7 @@ impl Host {
         let new = NewSession {
             id: id.clone(),
             project_id: project.id.clone(),
-            agent: name,
+            agent: name.clone(),
             agent_version: agent.version.clone(),
             level: p.level,
             clean: p.clean,
@@ -400,6 +400,7 @@ impl Host {
             cwd,
             worktree,
             agent,
+            name.clone(),
             p.level,
             SessionOptions {
                 clean: p.clean,
@@ -619,6 +620,7 @@ impl Host {
             PathBuf::from(&summary.cwd),
             summary.worktree_path.is_some(),
             agent,
+            summary.agent.clone(),
             summary.level,
             SessionOptions {
                 clean: summary.clean,
@@ -905,6 +907,8 @@ struct SessionTask {
     cwd: PathBuf,
     worktree: bool,
     agent_config: AgentConfig,
+    /// The agent's name in actuo's agents config.
+    agent_name: String,
     level: Level,
     opts: SessionOptions,
     sandbox: Option<SandboxOptions>,
@@ -1103,6 +1107,7 @@ impl SessionTask {
         cwd: PathBuf,
         worktree: bool,
         agent_config: AgentConfig,
+        agent_name: String,
         level: Level,
         opts: SessionOptions,
         sandbox: Option<SandboxOptions>,
@@ -1117,6 +1122,7 @@ impl SessionTask {
             cwd,
             worktree,
             agent_config,
+            agent_name,
             level,
             opts,
             sandbox,
@@ -1142,7 +1148,13 @@ impl SessionTask {
         ready: Option<oneshot::Sender<HostResult<()>>>,
     ) {
         let reattaching = matches!(attach, Attach::Existing(_));
-        if let Err(SetupError(kind, message)) = self.setup(attach).await {
+        if let Err(SetupError(kind, mut message)) = self.setup(attach).await {
+            if kind == ErrorKind::AuthRequired {
+                message = format!(
+                    "{message}: {}",
+                    login_hint(&self.agent_name, self.sandbox.is_some())
+                );
+            }
             // A failed reattach leaves the session detached, to try again later.
             self.error(kind, &message, !reattaching).await;
             if let Some((agent, _)) = &self.agent {
@@ -1996,12 +2008,23 @@ async fn blocking<T: Send + 'static, E: Send + 'static>(
 pub(crate) fn setup_error(e: AgentError) -> SetupError {
     let kind = agent_error_kind(&e);
     let message = match &e {
-        AgentError::AuthRequired(m) => {
-            format!("the agent needs a login; log in with the agent's own CLI ({m})")
-        }
+        AgentError::AuthRequired(m) => format!("the agent needs a login ({m})"),
         e => e.to_string(),
     };
     SetupError(kind, message)
+}
+
+/// How to log `agent` in: sandboxed (lane) sessions use actuo's own login for it,
+/// others the agent's own CLI on this machine.
+pub fn login_hint(agent: &str, sandboxed: bool) -> String {
+    if sandboxed {
+        return format!("log it in for sandboxed runs with `actuo login {agent}`");
+    }
+    match agent {
+        "claude" => "log in with `claude auth login`".into(),
+        "codex" => "log in with `codex login`".into(),
+        _ => format!("log {agent} in with its own CLI"),
+    }
 }
 
 fn agent_error_kind(e: &AgentError) -> ErrorKind {

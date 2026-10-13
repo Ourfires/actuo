@@ -44,7 +44,7 @@ impl Client {
     pub async fn connect(socket: &Path) -> Result<(Self, mpsc::UnboundedReceiver<Event>)> {
         let stream = UnixStream::connect(socket).await.with_context(|| {
             format!(
-                "can't reach actuo at {} (is `actuo serve` running?)",
+                "actuo isn't running (nothing answers at {}): start it with `actuo service install`, or `actuo serve` in the foreground",
                 socket.display()
             )
         })?;
