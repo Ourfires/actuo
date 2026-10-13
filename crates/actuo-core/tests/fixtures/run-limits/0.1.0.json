@@ -1,0 +1,63 @@
+{
+  "turn_time_limit_s": 1800,
+  "run_time_limit_s": 7200,
+  "max_check_retries": 2,
+  "max_changed_files": 50,
+  "max_changed_lines": 1500,
+  "max_reject_turns": 2,
+  "max_restart_turns": 1,
+  "output_tail_lines": 200,
+  "output_tail_bytes": 20480,
+  "max_prompt_bytes": 32768,
+  "protected_paths": [
+    ".github/",
+    ".claude/",
+    ".codex/",
+    ".mcp.json",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "web_tools": false,
+  "sign_commits": false,
+  "setup": null,
+  "setup_time_limit_s": 600,
+  "checks": null,
+  "check_time_limit_s": 600,
+  "network": null,
+  "agent_network": false,
+  "checks_unix_sockets": false,
+  "setup_reads_npmrc": false,
+  "checks_local_ports": [],
+  "checks_local_listen_ports": [],
+  "read": [],
+  "telemetry": false,
+  "commit_check": null,
+  "commit_subject_prompt": null,
+  "co_authored_by": true,
+  "rules": [
+    {
+      "kind": "execute",
+      "answer": [
+        "allow_once"
+      ]
+    },
+    {
+      "kind": "edit",
+      "inside_worktree": true,
+      "answer": [
+        "allow_once"
+      ]
+    }
+  ],
+  "labels": {
+    "trigger": "actuo",
+    "running": "actuo:running",
+    "waiting": "actuo:waiting",
+    "pr": "actuo:pr",
+    "failed": "actuo:failed",
+    "agent_prefix": "agent:"
+  },
+  "trusted": [
+    "me"
+  ]
+}

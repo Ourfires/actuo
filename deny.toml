@@ -1,0 +1,13 @@
+# The licenses a dependency may have: permissive ones only. `cargo deny check
+# licenses` runs in CI (.github/workflows/ci.yml); a dependency under any other
+# license fails it.
+[licenses]
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.9

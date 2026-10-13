@@ -1,0 +1,33 @@
+[package]
+name = "actuo-core"
+description = "Sessions, agent host, store and git for actuo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+agent-client-protocol.workspace = true
+actuo-protocol.workspace = true
+rusqlite.workspace = true
+rustix.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+toml.workspace = true
+toml_edit.workspace = true
+serde_path_to_error.workspace = true
+uuid.workspace = true
+pulldown-cmark.workspace = true
+regex.workspace = true
+globset.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

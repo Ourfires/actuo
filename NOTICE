@@ -1,0 +1,10 @@
+actuo
+Copyright 2026 Ourfires
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes software from the Agent Client Protocol Rust SDK
+(https://github.com/agentclientprotocol/rust-sdk), Copyright 2025 Zed
+Industries, Inc. and contributors, licensed under the Apache License,
+Version 2.0: the fake agent's setup in crates/fake-agent/src/main.rs is
+adapted from its examples/simple_agent.rs.
