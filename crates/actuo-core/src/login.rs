@@ -32,7 +32,7 @@ pub async fn login(
     if let (Some(dir), Some(p), Some(v), Some(b)) =
         (a.install_dir(paths), &a.package, &a.version, &a.bin)
     {
-        sandbox::install(&dir, p, v, b).await?;
+        sandbox::install(paths, &dir, p, v, b).await?;
     }
     sandbox::probe(paths).await?;
     let program = a.login_program(paths).expect("login is set");
@@ -79,7 +79,7 @@ pub async fn login(
     let mut write = dirs.clone();
     write.push(tmp.clone());
     let policy = Policy {
-        read: vec![agents_dir.clone()],
+        read: vec![agents_dir.clone(), paths.home.join("node")],
         write,
         hosts: l.hosts.clone(),
         local_binding: l.local_binding,
@@ -118,7 +118,7 @@ pub async fn login(
     let mut write = dirs;
     write.push(tmp.clone());
     let policy = Policy {
-        read: vec![agents_dir],
+        read: vec![agents_dir, paths.home.join("node")],
         write,
         hosts: a.sandbox.hosts.clone(),
         local_binding: false,
@@ -187,7 +187,11 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let paths = Paths::new(dir.path().join("home"));
-        // An srt that runs the command as is.
+        // A node and an srt that run the command as is.
+        let node = crate::node::bin(&paths);
+        std::fs::create_dir_all(node.parent().unwrap()).unwrap();
+        std::fs::write(&node, "#!/bin/sh\nexec \"$@\"\n").unwrap();
+        std::fs::set_permissions(&node, std::fs::Permissions::from_mode(0o755)).unwrap();
         let srt = sandbox::srt(&paths);
         std::fs::create_dir_all(srt.parent().unwrap()).unwrap();
         std::fs::write(

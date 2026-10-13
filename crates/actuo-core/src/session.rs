@@ -1049,7 +1049,13 @@ async fn sandboxed(
         let tmp = crate::sandbox::temp_dir(&paths, &name).map_err(|e| e.to_string())?;
         let git = crate::sandbox::gitconfig(&paths).map_err(|e| e.to_string())?;
         let common = git::common_dir(&cwd).map_err(|e| e.to_string())?;
-        let mut read = vec![cwd.clone(), common, paths.home.join("agents"), git.clone()];
+        let mut read = vec![
+            cwd.clone(),
+            common,
+            paths.home.join("agents"),
+            paths.home.join("node"),
+            git.clone(),
+        ];
         read.extend(read_lists);
         let mut write = vec![cwd.clone(), tmp.clone()];
         write.extend(state_dirs);
@@ -1172,7 +1178,18 @@ impl SessionTask {
     }
 
     async fn setup(&mut self, attach: Attach) -> Result<(), SetupError> {
-        // An adapter with a pinned package runs from its own install.
+        // An adapter with a pinned package runs from its own install, on actuo's
+        // pinned Node.
+        if self.agent_config.package.is_some() && !crate::node::bin(&self.host.paths).exists() {
+            self.set_state(
+                SessionState::Starting,
+                Some(&format!("installing node {}", crate::node::VERSION)),
+            )
+            .await;
+            crate::node::ensure(&self.host.paths)
+                .await
+                .map_err(|e| SetupError(ErrorKind::AgentError, e))?;
+        }
         if let (Some(dir), Some(package), Some(version), Some(bin)) = (
             self.agent_config.install_dir(&self.host.paths),
             self.agent_config.package.clone(),
@@ -1185,7 +1202,7 @@ impl SessionTask {
                 Some(&format!("installing {package}@{version}")),
             )
             .await;
-            crate::sandbox::install(&dir, &package, &version, &bin)
+            crate::sandbox::install(&self.host.paths, &dir, &package, &version, &bin)
                 .await
                 .map_err(|e| SetupError(ErrorKind::AgentError, e))?;
         }

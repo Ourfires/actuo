@@ -7,7 +7,7 @@
 
 use crate::client::Client;
 use actuo_core::config::Paths;
-use actuo_core::process::{output_std, spawn_std};
+use actuo_core::process::spawn_std;
 use actuo_core::release;
 use anyhow::{Context, Result, anyhow, bail};
 use std::path::Path;
@@ -48,7 +48,6 @@ pub async fn update(paths: &Paths, now: bool) -> Result<()> {
     let installed = install(&dir, asset, &latest, now);
     let _ = std::fs::remove_dir_all(&dir);
     installed?;
-    out!("if this release changed the agents' pinned versions, also run: actuo agents install");
     Ok(())
 }
 
@@ -59,14 +58,14 @@ fn install(dir: &Path, asset: &str, commit: &str, now: bool) -> Result<()> {
     let bin = dir.join("actuo");
     let sum = dir.join("actuo.sha256");
     out!("downloading {asset} ({commit})");
-    download(&url, &bin)?;
-    download(&format!("{url}.sha256"), &sum)?;
+    release::download(&url, &bin).map_err(|e| anyhow!(e))?;
+    release::download(&format!("{url}.sha256"), &sum).map_err(|e| anyhow!(e))?;
     let want = std::fs::read_to_string(&sum)?
         .split_whitespace()
         .next()
         .unwrap_or_default()
         .to_string();
-    let got = sha256(&bin)?;
+    let got = release::sha256(&bin).map_err(|e| anyhow!(e))?;
     if got != want {
         bail!("the download's sha256 is {got}, the release says {want}");
     }
@@ -92,43 +91,4 @@ fn install(dir: &Path, asset: &str, commit: &str, now: bool) -> Result<()> {
         bail!("the new actuo's `service install` failed ({status})");
     }
     Ok(())
-}
-
-fn download(url: &str, to: &Path) -> Result<()> {
-    let out = output_std(
-        Command::new("curl")
-            .args(["-fsSL", "--max-time", "600", "-o"])
-            .arg(to)
-            .arg(url),
-    )
-    .context("running curl")?;
-    if !out.status.success() {
-        bail!(
-            "downloading {url}: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        );
-    }
-    Ok(())
-}
-
-/// With `sha256sum` (Linux) or `shasum -a 256` (macOS), as `install.sh`.
-fn sha256(file: &Path) -> Result<String> {
-    let out = match output_std(Command::new("sha256sum").arg(file)) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            output_std(Command::new("shasum").args(["-a", "256"]).arg(file))
-        }
-        out => out,
-    }
-    .context("computing the download's sha256")?;
-    if !out.status.success() {
-        bail!(
-            "computing the download's sha256: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        );
-    }
-    Ok(String::from_utf8_lossy(&out.stdout)
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_string())
 }

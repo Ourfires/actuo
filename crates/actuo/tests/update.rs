@@ -143,8 +143,5 @@ fn update() {
     );
     assert!(!r.env.home.join("tmp/update-bbb2222").exists());
     let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(
-        stdout.contains("downloading ") && stdout.contains("actuo agents install"),
-        "{stdout}"
-    );
+    assert!(stdout.contains("downloading "), "{stdout}");
 }

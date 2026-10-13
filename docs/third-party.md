@@ -1,10 +1,18 @@
 # Third-party software
 
-Actuo is licensed under Apache-2.0. The agents it runs, their adapters and the sandbox are not part of it. Actuo downloads them with npm from the npm registry (the first time a session needs one, or all at once with `actuo agents install`), each under its own license and terms. You use your own agent accounts, under the agent provider's terms, and you pay for what the agents use.
+Actuo is licensed under Apache-2.0. The agents it runs, their adapters, the sandbox and the Node.js they run on are not part of it. Actuo downloads them (the first time a session needs one, or all at once with `actuo agents install`), each under its own license and terms. You use your own agent accounts, under the agent provider's terms, and you pay for what the agents use.
 
-The versions below are the pins of this source tree (`crates/actuo-core/src/config.rs` and `crates/actuo-core/src/sandbox.rs`). `actuo agents` shows the versions your actuo uses. Licenses are as each package's own metadata states them; read the package for its full terms.
+The versions below are the pins of this source tree (`crates/actuo-core/src/config.rs`, `crates/actuo-core/src/sandbox.rs` and `crates/actuo-core/src/node.rs`). `actuo agents` shows the versions your actuo uses. Licenses are as each package's own metadata states them; read the package for its full terms.
 
-## Downloaded from npm
+## Node.js, from nodejs.org
+
+| Download | Pinned version | License | Used for |
+| --- | --- | --- | --- |
+| Node.js, the official build for your platform (`.tar.xz`) | v24.21.0 (LTS) | MIT; its `LICENSE` file lists the licenses of what it bundles, npm's Artistic-2.0 among them | Running the adapters and the sandbox, and installing them with its npm |
+
+It's checked against the sha256 pinned in actuo for each platform (from nodejs.org's `SHASUMS256.txt` for that version) and unpacked into `~/.actuo/node/<version>`; other versions there are removed. Actuo runs the adapters and `srt` as `<that node> <script>`: the `node` on your `PATH` isn't used for them, and your `PATH` is left as it is for everything else.
+
+## Downloaded from npm, with that Node's npm
 
 Each package is installed into its own folder, `~/.actuo/agents/<package>@<version>`.
 
@@ -30,7 +38,6 @@ Actuo calls these programs; it doesn't ship them.
 
 | Program | Used for |
 | --- | --- |
-| Node.js and npm | Installing and running the adapters and the sandbox. The Claude adapter needs Node 22 or later |
 | `git` | Worktrees, checkpoints, commits and pushes |
 | `gh` (GitHub CLI) | The lane: issues, labels, comments, pull requests, cloning |
 | `curl` | The install script, `actuo update`, and the release check |
@@ -40,7 +47,7 @@ Actuo calls these programs; it doesn't ship them.
 
 ## What actuo fetches by itself
 
-- **Adapters and the sandbox**, from the npm registry: by `actuo agents install`, and when a session or `actuo login` needs one that isn't installed yet.
+- **Node.js**, from nodejs.org, and **the adapters and the sandbox**, from the npm registry: by `actuo agents install`, and when a session or `actuo login` needs one that isn't installed yet.
 - **The latest release's version**, from actuo's GitHub releases (Ourfires/actuo): when `actuo serve` starts and once a day after. `actuo status` shows when a newer release is out. Nothing is installed until you run `actuo update`.
 - **Agent options.** For each pinned agent in use, actuo starts the agent once per version, without a prompt, to learn which models and options it offers (`actuo agents probe`). No tokens are spent.
 

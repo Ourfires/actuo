@@ -478,6 +478,16 @@ async fn run(cli: Cli) -> Result<()> {
             if json {
                 return print_json(&r);
             }
+            // The Node actuo runs the adapters and srt on (its own, pinned).
+            out!(
+                "node\t{}\t{}",
+                actuo_core::node::VERSION,
+                if actuo_core::node::bin(&paths).exists() {
+                    "installed"
+                } else {
+                    "not installed yet: the first session installs it (about 30 MB), or actuo agents install"
+                }
+            );
             for a in r.agents {
                 // What it gets from actuo's environment, names only.
                 let passes = if a.pass_env.is_empty() {
@@ -1501,10 +1511,24 @@ fn show_setting(settings: &serde_json::Value, keys: Option<&[String]>) -> Result
 async fn install(paths: &Paths) -> Result<()> {
     use actuo_core::sandbox;
     let agents = AgentsConfig::load(&paths.agents_toml()).map_err(anyhow::Error::msg)?;
-    let dir = sandbox::install_dir(paths, sandbox::SRT_PACKAGE, sandbox::SRT_VERSION);
-    sandbox::install(&dir, sandbox::SRT_PACKAGE, sandbox::SRT_VERSION, "srt")
+    actuo_core::node::ensure(paths)
         .await
         .map_err(anyhow::Error::msg)?;
+    out!(
+        "node {}\t{}",
+        actuo_core::node::VERSION,
+        actuo_core::node::dir(paths).display()
+    );
+    let dir = sandbox::install_dir(paths, sandbox::SRT_PACKAGE, sandbox::SRT_VERSION);
+    sandbox::install(
+        paths,
+        &dir,
+        sandbox::SRT_PACKAGE,
+        sandbox::SRT_VERSION,
+        "srt",
+    )
+    .await
+    .map_err(anyhow::Error::msg)?;
     out!(
         "{}@{}\t{}",
         sandbox::SRT_PACKAGE,
@@ -1515,7 +1539,7 @@ async fn install(paths: &Paths) -> Result<()> {
         if let (Some(dir), Some(p), Some(v), Some(b)) =
             (a.install_dir(paths), &a.package, &a.version, &a.bin)
         {
-            sandbox::install(&dir, p, v, b)
+            sandbox::install(paths, &dir, p, v, b)
                 .await
                 .map_err(anyhow::Error::msg)?;
             out!("{name}\t{p}@{v}\t{}", dir.display());

@@ -28,7 +28,7 @@ test('preload inserts trusted launcher, scrubs policy inputs, and rejects unknow
     cp.spawn = (...args) => {captured = args;};
     require(${JSON.stringify(preload)});
     cp.spawn('env HTTP_PROXY=x /usr/bin/sandbox-exec -p policy /bin/bash -c test', {shell: true});
-    assert(captured[0].includes(" node '/trusted/actuo'"));
+    assert(captured[0].includes(" '" + process.execPath + "' '/trusted/actuo"));
     assert(captured[0].includes(JSON.stringify({connect: [55421], listen: [56000]})));
     assert(captured[0].includes(" -p policy /bin/bash -c test"));
     assert.equal(captured[1].env.ACTUO_SRT_LOCAL_PORTS, undefined);

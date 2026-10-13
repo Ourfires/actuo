@@ -2672,6 +2672,7 @@ impl RunTask {
         }
         let env: Vec<(&str, &str)> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         let srt = crate::sandbox::srt(self.lane.host.paths());
+        let node = crate::node::bin(self.lane.host.paths());
         let node_options = match crate::sandbox::records_node_options(self.lane.host.paths()) {
             Ok(x) => x,
             Err(e) => return Err(self.fail("sandbox_unavailable", &e.to_string()).await),
@@ -2703,6 +2704,7 @@ impl RunTask {
             &self.worktree,
             &env,
             Some(super::steps::Srt {
+                node: &node,
                 program: &srt,
                 settings: &settings,
                 node_options: &node_options,

@@ -6,7 +6,7 @@ You need:
 
 - Rust. The toolchain is pinned in `rust-toolchain.toml`; `rustup` installs it, with `rustfmt` and `clippy`, the first time you build.
 - `git` on `PATH`.
-- Node.js, for one test (`crates/actuo-core/tests/srt_records.rs` runs the sandbox's records preload with real Node).
+- Node.js, for one test only (`crates/actuo-core/tests/srt_records.rs` runs the sandbox's records preload with real Node). Actuo itself downloads its own pinned Node; the tests use a stand-in for it and never download it.
 
 ```bash
 cargo build

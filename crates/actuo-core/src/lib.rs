@@ -9,6 +9,7 @@ pub mod git;
 pub mod lane;
 pub mod log;
 pub mod login;
+pub mod node;
 pub mod pass_env;
 pub mod probe;
 pub mod process;

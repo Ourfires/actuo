@@ -131,8 +131,16 @@ pub fn install_dir(paths: &Paths, package: &str, version: &str) -> PathBuf {
 }
 
 /// Installs an npm package at its pinned version into its own directory under
-/// `~/.actuo/agents`, once (outside any sandbox). One install at a time.
-pub async fn install(dir: &Path, package: &str, version: &str, bin: &str) -> Result<(), String> {
+/// `~/.actuo/agents`, once (outside any sandbox), with actuo's pinned Node and its
+/// npm, installing that Node first if needed. One install at a time.
+pub async fn install(
+    paths: &Paths,
+    dir: &Path,
+    package: &str,
+    version: &str,
+    bin: &str,
+) -> Result<(), String> {
+    let node = crate::node::ensure(paths).await?;
     static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
     let _one = LOCK.lock().await;
     if dir.join("node_modules/.bin").join(bin).exists() {
@@ -143,7 +151,10 @@ pub async fn install(dir: &Path, package: &str, version: &str, bin: &str) -> Res
         .map_err(|e| format!("{}: {e}", dir.display()))?;
     let spec = format!("{package}@{version}");
     let out = crate::process::output(
-        tokio::process::Command::new("npm")
+        tokio::process::Command::new(&node)
+            .arg(crate::node::npm_cli(paths))
+            // Install scripts run on the same Node.
+            .env("PATH", crate::node::path_with(paths))
             .args([
                 "install",
                 "--no-audit",
@@ -244,8 +255,8 @@ pub fn env(
     env
 }
 
-/// `srt [--debug] --settings <file> -- <program> <args>`: after `--`, nothing is
-/// read as srt's own options. `debug` only with [`records`] attached, which takes
+/// `<pinned node> srt [--debug] --settings <file> -- <program> <args>`: after
+/// `--`, nothing is read as srt's own options. `debug` only with [`records`] attached, which takes
 /// srt's debug log off the stderr it shares with the program.
 pub fn wrap(
     paths: &Paths,
@@ -254,7 +265,7 @@ pub fn wrap(
     program: &str,
     args: &[String],
 ) -> (String, Vec<String>) {
-    let mut a = Vec::new();
+    let mut a = vec![srt(paths).display().to_string()];
     if debug {
         a.push("--debug".to_string());
     }
@@ -265,7 +276,7 @@ pub fn wrap(
         program.to_string(),
     ]);
     a.extend(args.iter().cloned());
-    (srt(paths).display().to_string(), a)
+    (crate::node::bin(paths).display().to_string(), a)
 }
 
 /// The preload that takes srt's console output off its stderr (see the file).
@@ -433,11 +444,12 @@ pub fn read_records(
     })
 }
 
-/// Whether `srt` runs here: installs it if needed, then runs `true` inside it with
-/// nothing allowed. The error says why not (missing Node, `bwrap`, `socat`,
-/// `ripgrep`, or user namespaces on Linux).
+/// Whether `srt` runs here: installs it (and actuo's Node) if needed, then runs
+/// `true` inside it with nothing allowed. The error says why not (missing `bwrap`,
+/// `socat`, `ripgrep`, or user namespaces on Linux).
 pub async fn probe(paths: &Paths) -> Result<(), String> {
     install(
+        paths,
         &install_dir(paths, SRT_PACKAGE, SRT_VERSION),
         SRT_PACKAGE,
         SRT_VERSION,
@@ -625,10 +637,13 @@ mod tests {
                 .unwrap()
                 .contains("hooksPath = /dev/null")
         );
+        // Actuo's pinned Node runs srt.
         let (program, args) = wrap(&paths, &f, false, "node", &["x.js".into()]);
+        assert_eq!(program, crate::node::bin(&paths).display().to_string());
         assert!(
-            program.ends_with("agents/@anthropic-ai/sandbox-runtime@0.0.78/node_modules/.bin/srt")
+            args[0].ends_with("agents/@anthropic-ai/sandbox-runtime@0.0.78/node_modules/.bin/srt")
         );
+        let args = &args[1..];
         assert_eq!(args[0], "--settings");
         assert_eq!(&args[2..], ["--", "node", "x.js"]);
         // srt's own options come before `--`; the program's, even ones srt has
@@ -637,6 +652,7 @@ mod tests {
             .map(String::from)
             .into();
         let (_, args) = wrap(&paths, &f, true, "tool", &theirs);
+        let args = &args[1..];
         assert_eq!(
             &args[..3],
             ["--debug", "--settings", &f.display().to_string()]

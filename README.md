@@ -45,7 +45,7 @@ On Linux, a user unit stops when you log out unless linger is on for your user. 
 For sessions:
 
 - `git`, and `curl` (install and updates).
-- Node.js and npm. The first time a session uses an agent, actuo installs that agent's pinned adapter with npm into `~/.actuo/agents`. The Claude adapter needs Node 22 or later.
+- Nothing else for the agents' adapters: the first time a session uses an agent, actuo installs its own pinned Node.js (about 30 MB, into `~/.actuo/node`) and the agent's pinned adapter (into `~/.actuo/agents`). The Node on your `PATH`, if any, isn't used for them.
 - An account with each agent you use (Claude Code, Codex), logged in once with the agent's own CLI. Actuo doesn't sign you up or log you in to anything; see "Agent logins" below.
 
 For the issue-to-PR lane, also:
@@ -61,7 +61,7 @@ Start a session on a local repository, with a first prompt, and attach to it:
 actuo start ~/code/my-app --prompt "Explain this project" --attach
 ```
 
-The first session with an agent installs its adapter first, which takes a minute. `start` prints the session's id. The agent works in a new worktree under `~/.actuo/worktrees`, on the branch `actuo/<session id>`, starting from your checkout's `HEAD`. The files in your checkout aren't touched.
+The first session with an agent installs actuo's Node and the agent's adapter first, which takes a minute or two. `start` prints the session's id. The agent works in a new worktree under `~/.actuo/worktrees`, on the branch `actuo/<session id>`, starting from your checkout's `HEAD`. The files in your checkout aren't touched.
 
 While attached, you see the agent's messages and tool calls as they come. When it asks for permission, its options are numbered: type the number (or `c` to cancel) and press Enter. Any other line is sent as the next prompt. `/interrupt` cancels the running turn, `/stop` ends the session, `/quit` detaches and leaves the session running.
 

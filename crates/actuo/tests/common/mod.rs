@@ -53,6 +53,7 @@ impl Env {
         let root = dir.path().canonicalize().unwrap();
         let home = root.join("home");
         std::fs::create_dir_all(&home).unwrap();
+        fake_node(&home);
         let mut toml = String::new();
         for (name, script) in agents {
             let script_path = root.join(format!("{name}-script.json"));
@@ -333,4 +334,15 @@ pub fn alive(pid: u32) -> bool {
         .unwrap();
     let stat = String::from_utf8_lossy(&out.stdout);
     out.status.success() && !stat.trim().is_empty() && !stat.trim().starts_with('Z')
+}
+
+/// A stand-in for actuo's pinned Node in `home`: it runs its first argument as a
+/// program, so `fake-srt` and shell-script adapters still run, and nothing is
+/// downloaded.
+pub fn fake_node(home: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let node = actuo_core::node::bin(&actuo_core::config::Paths::new(home.to_path_buf()));
+    std::fs::create_dir_all(node.parent().unwrap()).unwrap();
+    std::fs::write(&node, "#!/bin/sh\nexec \"$@\"\n").unwrap();
+    std::fs::set_permissions(&node, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
