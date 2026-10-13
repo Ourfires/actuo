@@ -34,47 +34,38 @@ Put the binary on your `PATH`:
 export PATH="$HOME/.actuo/bin:$PATH"
 ```
 
-Then install the agent adapters and the sandbox into actuo's home (`~/.actuo/agents`):
-
-```bash
-actuo agents install
-```
-
-It installs each built-in agent's pinned adapter and the sandbox (`srt`) with npm, then checks that the sandbox runs on this machine.
-
 Later, update to the latest release with:
 
 ```bash
 actuo update
 ```
 
-It waits for running work to finish (up to 30 minutes; `--now` doesn't wait), replaces the binary, and restarts the service. If the new actuo doesn't answer within 30 seconds, the previous one is put back. If a release changes the agents' pinned versions, run `actuo agents install` again.
+It waits for running work to finish (up to 30 minutes; `--now` doesn't wait), replaces the binary, and restarts the service. If the new actuo doesn't answer within 30 seconds, the previous one is put back. When a release pins newer adapter versions, each is installed the first time a session needs it.
 
 On Linux, a user unit stops when you log out unless linger is on for your user. The install says so and gives the `loginctl enable-linger` command, which root runs.
 
 ## Requirements
 
+For sessions:
+
 - `git`, and `curl` (install and updates).
-- Node.js and npm, to install and run the agent adapters and the sandbox. The Claude adapter needs Node 22 or later.
-- An account with each agent you use (Claude Code, Codex). Actuo doesn't sign you up or log you in to anything; see "Agent logins" below.
-- For the lane: the GitHub CLI `gh`, logged in as an account that can push to the repos you add.
-- On Linux, the sandbox needs `bubblewrap`, `socat` and `ripgrep`, and user namespaces. `actuo agents install` runs the sandbox once and fails with the reason if one is missing. Ubuntu 24.04 and later restrict user namespaces by default; the sandbox-runtime README explains the setting.
+- Node.js and npm. The first time a session uses an agent, actuo installs that agent's pinned adapter with npm into `~/.actuo/agents`. The Claude adapter needs Node 22 or later.
+- An account with each agent you use (Claude Code, Codex), logged in once with the agent's own CLI. Actuo doesn't sign you up or log you in to anything; see "Agent logins" below.
+
+For the issue-to-PR lane, also:
+
+- The GitHub CLI `gh`, logged in as an account that can push to the repos you add.
+- On Linux, the sandbox needs `bubblewrap`, `socat` and `ripgrep`, and user namespaces. Ubuntu 24.04 and later restrict user namespaces by default; the sandbox-runtime README explains the setting.
 
 ## Quick start
-
-Check that actuo answers:
-
-```bash
-actuo status
-```
 
 Start a session on a local repository, with a first prompt, and attach to it:
 
 ```bash
-actuo start ~/code/my-app --prompt "Add a --verbose flag to the CLI" --attach
+actuo start ~/code/my-app --prompt "Explain this project" --attach
 ```
 
-`start` prints the session's id. The agent works in a new worktree under `~/.actuo/worktrees`, on the branch `actuo/<session id>`, starting from your checkout's `HEAD`. The files in your checkout aren't touched.
+The first session with an agent installs its adapter first, which takes a minute. `start` prints the session's id. The agent works in a new worktree under `~/.actuo/worktrees`, on the branch `actuo/<session id>`, starting from your checkout's `HEAD`. The files in your checkout aren't touched.
 
 While attached, you see the agent's messages and tool calls as they come. When it asks for permission, its options are numbered: type the number (or `c` to cancel) and press Enter. Any other line is sent as the next prompt. `/interrupt` cancels the running turn, `/stop` ends the session, `/quit` detaches and leaves the session running.
 
@@ -184,6 +175,18 @@ actuo sessions
 Sessions and lane runs keep going when you disconnect. Actuo listens only on a Unix socket in its home folder; it opens no network port. `ssh <host> actuo stdio` joins the SSH connection to that socket.
 
 ## The issue-to-PR lane
+
+Lane runs work in a sandbox, with an agent login of their own. Prepare both once:
+
+```bash
+actuo agents install
+```
+
+```bash
+actuo login claude
+```
+
+`actuo agents install` installs the pinned adapters and the sandbox (`srt`), then runs the sandbox once and says what's missing if it can't run here (on Linux: `bubblewrap`, `socat`, `ripgrep` or user namespaces). `actuo login codex` logs Codex in instead. Then add a project, check that its setup and checks run in the sandbox, and turn its lane on:
 
 ```bash
 actuo project add owner/repo

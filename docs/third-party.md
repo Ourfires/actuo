@@ -1,10 +1,10 @@
 # Third-party software
 
-Actuo is licensed under Apache-2.0. The agents it runs, their adapters and the sandbox are not part of it. `actuo agents install` downloads them with npm from the npm registry, each under its own license and terms. You use your own agent accounts, under the agent provider's terms, and you pay for what the agents use.
+Actuo is licensed under Apache-2.0. The agents it runs, their adapters and the sandbox are not part of it. Actuo downloads them with npm from the npm registry (the first time a session needs one, or all at once with `actuo agents install`), each under its own license and terms. You use your own agent accounts, under the agent provider's terms, and you pay for what the agents use.
 
 The versions below are the pins of this source tree (`crates/actuo-core/src/config.rs` and `crates/actuo-core/src/sandbox.rs`). `actuo agents` shows the versions your actuo uses. Licenses are as each package's own metadata states them; read the package for its full terms.
 
-## Downloaded by `actuo agents install`
+## Downloaded from npm
 
 Each package is installed into its own folder, `~/.actuo/agents/<package>@<version>`.
 
