@@ -28,11 +28,7 @@ curl -fsSL https://github.com/Ourfires/actuo/releases/latest/download/install.sh
 
 The script checks the download's sha256 and installs actuo for your user, never as root. It copies the binary to `~/.actuo/bin/actuo` and starts it as a service of your user: a launch agent on macOS, a systemd user unit on Linux. On macOS the service logs to `~/.actuo/logs/serve.log`; on Linux, read them with `journalctl --user -u actuo`.
 
-Put the binary on your `PATH`:
-
-```bash
-export PATH="$HOME/.actuo/bin:$PATH"
-```
+Unless `~/.actuo/bin` is on your `PATH` already, the script adds one line that puts it there to your shell's startup file (`~/.zshrc`; `~/.bashrc` on Linux or `~/.bash_profile` on macOS; fish's `conf.d`; else `~/.profile`) and says which. Open a new terminal to use `actuo`. To leave your startup file alone, run the script with `sh -s -- --no-modify-path` instead of `sh`.
 
 Later, update to the latest release with:
 
