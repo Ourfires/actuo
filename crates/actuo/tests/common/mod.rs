@@ -123,6 +123,8 @@ impl Env {
             .unwrap();
         let child = Command::new(env!("CARGO_BIN_EXE_actuo"))
             .arg("serve")
+            // Not the test runner's own (CI's runs under systemd); a test sets it.
+            .env_remove("JOURNAL_STREAM")
             .envs(self.env.iter().map(|(k, v)| (k, v)))
             .env("ACTUO_HOME", &self.home)
             .stdin(Stdio::null())
