@@ -336,6 +336,7 @@ impl Lane {
         let env: Vec<(&str, &str)> = env.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         let paths = self.host.paths();
         let srt = crate::sandbox::srt(paths);
+        let node = crate::node::bin(paths);
         let node_options =
             crate::sandbox::records_node_options(paths).map_err(|e| e.to_string())?;
         let kind_name = if setup { "setup" } else { "check" };
@@ -352,6 +353,7 @@ impl Lane {
             worktree,
             &env,
             Some(Srt {
+                node: &node,
                 program: &srt,
                 settings: &settings,
                 node_options: &node_options,

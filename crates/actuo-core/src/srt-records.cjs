@@ -41,7 +41,7 @@ function withLocalPorts(args) {
     throw new Error('Cannot apply local check service policy to sandbox command');
   }
   const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
-  args[0] = args[0].replace(marker, ` node ${quote(localWrapper)} ${quote(localPorts)} -p `);
+  args[0] = args[0].replace(marker, ` ${quote(process.execPath)} ${quote(localWrapper)} ${quote(localPorts)} -p `);
   return args;
 }
 

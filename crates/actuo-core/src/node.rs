@@ -48,6 +48,15 @@ pub fn npm_cli(paths: &Paths) -> PathBuf {
     dir(paths).join("lib/node_modules/npm/bin/npm-cli.js")
 }
 
+/// `PATH` with the pinned Node's `bin` first (for npm's install scripts).
+pub fn path_with(paths: &Paths) -> std::ffi::OsString {
+    let mut dirs = vec![dir(paths).join("bin")];
+    if let Some(path) = std::env::var_os("PATH") {
+        dirs.extend(std::env::split_paths(&path));
+    }
+    std::env::join_paths(dirs).unwrap_or_default()
+}
+
 /// Installs the pinned Node if it isn't yet; returns its `node`. One install at
 /// a time.
 pub async fn ensure(paths: &Paths) -> Result<PathBuf, String> {

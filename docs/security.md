@@ -34,10 +34,10 @@ What each process may read, write and reach:
 
 | | Reads | Writes | Reaches |
 | --- | --- | --- | --- |
-| Agent session | its worktree, the repo's git folder, the installed adapters, the project's `read` list | its worktree, its temp folder, its own config folder under `~/.actuo/agent-homes` | its model API hosts; the package registries in the project's `network` (all of `network` with `agent_network`) |
+| Agent session | its worktree, the repo's git folder, the installed adapters and actuo's Node, the project's `read` list | its worktree, its temp folder, its own config folder under `~/.actuo/agent-homes` | its model API hosts; the package registries in the project's `network` (all of `network` with `agent_network`) |
 | Setup | its worktree, the repo's git folder, the project's package store, the project's `read` list; `~/.npmrc` only with the project's `setup_reads_npmrc` | its worktree, its temp folder, the package store (`~/.actuo/stores/<owner>/<repo>`) | the project's `network` |
 | Checks, commit check | its worktree, the repo's git folder, the package store, the project's `read` list | its worktree, its temp folder | nothing; on macOS, the loopback ports in `checks_local_ports` and `checks_local_listen_ports` (see below) |
-| `actuo login <agent>` | the installed adapters | the agent's config folder under `~/.actuo/agent-homes`, a temp folder | the agent's login hosts; it may listen on localhost for an OAuth callback |
+| `actuo login <agent>` | the installed adapters and actuo's Node | the agent's config folder under `~/.actuo/agent-homes`, a temp folder | the agent's login hosts; it may listen on localhost for an OAuth callback |
 
 On macOS, the sandbox can't keep `checks_local_listen_ports` to loopback: while a check listens on one of those ports, other machines on the network can reach it too. Set them only for tests you trust, on a network you trust.
 

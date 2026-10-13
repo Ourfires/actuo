@@ -442,18 +442,26 @@ impl AgentConfig {
         Some(paths.home.join("agents").join(format!("{p}@{v}")))
     }
 
-    /// The program and arguments that start the agent: the installed adapter for an
-    /// agent with `package`, else `command`.
+    /// The installed adapter script of an agent with `package`.
+    pub fn adapter(&self, paths: &Paths) -> Option<PathBuf> {
+        Some(
+            self.install_dir(paths)?
+                .join("node_modules/.bin")
+                .join(self.bin.as_ref()?),
+        )
+    }
+
+    /// The program and arguments that start the agent: for an agent with
+    /// `package`, actuo's pinned Node ([`crate::node`]) running its adapter; else
+    /// `command`.
     pub fn program(&self, paths: &Paths) -> (String, Vec<String>) {
-        match (self.install_dir(paths), &self.bin) {
-            (Some(dir), Some(bin)) => (
-                dir.join("node_modules/.bin")
-                    .join(bin)
-                    .display()
-                    .to_string(),
-                self.args.clone(),
-            ),
-            _ => (self.command.clone(), self.args.clone()),
+        match self.adapter(paths) {
+            Some(script) => {
+                let mut args = vec![script.display().to_string()];
+                args.extend(self.args.iter().cloned());
+                (crate::node::bin(paths).display().to_string(), args)
+            }
+            None => (self.command.clone(), self.args.clone()),
         }
     }
 
@@ -559,7 +567,10 @@ impl AgentConfig {
         AgentEntry {
             name: name.to_string(),
             version: self.version.clone(),
-            command: self.program(&Paths::from_env()).0,
+            command: self
+                .adapter(&Paths::from_env())
+                .map(|a| a.display().to_string())
+                .unwrap_or_else(|| self.command.clone()),
             args: self.args.clone(),
             levels: self.modes.keys().copied().collect(),
             config,
@@ -1102,12 +1113,25 @@ mod tests {
     fn installed_adapters() {
         let c = AgentsConfig::builtin();
         let paths = Paths::new("/h");
+        // Actuo's pinned Node runs the adapter script.
         let (program, args) = c.agents["claude"].program(&paths);
         assert_eq!(
             program,
-            "/h/agents/@agentclientprotocol/claude-agent-acp@0.84.0/node_modules/.bin/claude-agent-acp"
+            format!("/h/node/{}/bin/node", crate::node::VERSION)
         );
-        assert!(args.is_empty());
+        assert_eq!(
+            args,
+            [
+                "/h/agents/@agentclientprotocol/claude-agent-acp@0.84.0/node_modules/.bin/claude-agent-acp"
+            ]
+        );
+        // agent/list shows the adapter.
+        assert!(
+            c.agents["claude"]
+                .adapter(&paths)
+                .unwrap()
+                .ends_with(".bin/claude-agent-acp")
+        );
         let mut a = c.agents["claude"].clone();
         a.bin = None;
         assert!(a.check().is_err());

@@ -48,7 +48,6 @@ pub async fn update(paths: &Paths, now: bool) -> Result<()> {
     let installed = install(&dir, asset, &latest, now);
     let _ = std::fs::remove_dir_all(&dir);
     installed?;
-    out!("if this release changed the agents' pinned versions, also run: actuo agents install");
     Ok(())
 }
 

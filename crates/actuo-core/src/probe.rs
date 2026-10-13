@@ -31,6 +31,11 @@ pub async fn probe(host: &Arc<Host>, agent: &str) -> HostResult<AgentOptions> {
         RpcError::new(ErrorKind::AgentNotFound, format!("no agent named {agent}"))
     })?;
     let _one = Probing::start(host, agent)?;
+    if config.package.is_some() {
+        crate::node::ensure(host.paths())
+            .await
+            .map_err(|e| RpcError::new(ErrorKind::AgentError, e))?;
+    }
     if let (Some(dir), Some(bin)) = (config.install_dir(host.paths()), &config.bin)
         && !dir.join("node_modules/.bin").join(bin).exists()
     {

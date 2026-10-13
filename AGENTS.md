@@ -19,6 +19,6 @@ A headless service that hosts coding-agent sessions: it spawns agent CLIs, speak
 - Lane runs always run in the sandbox; issue text and comments are untrusted input.
 - Everything actuo does has a CLI command (`crates/actuo/src/coverage.rs`, checked by a test). A setting's doc comment is its help (`actuo settings keys`).
 - Write events to the store before sending them. A crashed agent ends its session, never actuo.
-- Pin agent adapter and sandbox versions; check their current releases before changing a pin.
+- Pin agent adapter, sandbox and Node versions; check their current releases before changing a pin. Node's pin is `VERSION` and the three sha256s in `crates/actuo-core/src/node.rs`, from `https://nodejs.org/dist/<version>/SHASUMS256.txt`; bump it with Node's security releases.
 - Packages are named `actuo-*` (test stand-ins `fake-*`); never `core`.
 - Copied code must be under a compatible permissive license and keep its notice; Apache-2.0 code also gets a line in `NOTICE`.

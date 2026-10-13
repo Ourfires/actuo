@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 
 /// How a command runs inside `srt`.
 pub struct Srt<'a> {
+    /// Actuo's pinned `node`, which runs `program`.
+    pub node: &'a Path,
+    /// `srt` itself.
     pub program: &'a Path,
     pub settings: &'a Path,
     /// `NODE_OPTIONS` with the records preload (`sandbox::records_node_options`).
@@ -206,14 +209,15 @@ pub async fn run(
     let mut reader = reader;
     let copy = tokio::task::spawn_blocking(move || std::io::copy(&mut reader, &mut file));
     let started = Instant::now();
-    // Inside the sandbox: `srt --debug --settings <file> -- sh -c <command>`, with
+    // Inside the sandbox: `node srt --debug --settings <file> -- sh -c <command>`, with
     // only `env` (and the records preload): after `--`, nothing is read as srt's
     // own options. srt's debug log comes on a pipe of its own, never in the output.
     let mut records = None;
     let mut cmd = match &sandbox {
         Some(srt) => {
-            let mut c = tokio::process::Command::new(srt.program);
-            c.args(["--debug", "--settings"])
+            let mut c = tokio::process::Command::new(srt.node);
+            c.arg(srt.program)
+                .args(["--debug", "--settings"])
                 .arg(srt.settings)
                 .arg("--")
                 .env_clear()
