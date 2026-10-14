@@ -26,7 +26,7 @@ npm also installs each package's dependencies, each under its own license.
 
 ### What the adapters bring in
 
-- **Claude.** `claude-agent-acp` 0.84.0 depends on Anthropic's Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`, 0.3.284), which includes the Claude Code program for your platform. These are not open source. Their package metadata says: "© Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined here: https://code.claude.com/docs/en/legal-and-compliance." Using them needs your own Claude account or API key, under Anthropic's terms.
+- **Claude.** `claude-agent-acp` 0.84.0 depends on Anthropic's Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`, 0.3.284), which includes the Claude Code program for your platform. These are not open source. The SDK's package metadata says `SEE LICENSE IN README.md`, its platform package's `SEE LICENSE IN LICENSE.md`; their `LICENSE.md` says: "© Anthropic PBC. All rights reserved. Use is subject to the Legal Agreements outlined here: https://code.claude.com/docs/en/legal-and-compliance." Using them needs your own Claude account or API key, under Anthropic's terms.
 - **Codex.** `codex-acp` 2.0.1 depends on OpenAI's Codex CLI (`@openai/codex`, any `0.159.x` from 0.159.1, as npm resolves it at install time), whose package metadata says Apache-2.0. Using it needs your own OpenAI account, under OpenAI's terms.
 - **The sandbox.** sandbox-runtime uses the operating system's own sandboxing: Seatbelt on macOS, bubblewrap on Linux.
 
@@ -40,16 +40,18 @@ Actuo calls these programs; it doesn't ship them.
 | --- | --- |
 | `git` | Worktrees, checkpoints, commits and pushes |
 | `gh` (GitHub CLI) | The lane: issues, labels, comments, pull requests, cloning |
-| `curl` | The install script, `actuo update`, and the release check |
+| `curl` | The install script, `actuo update`, the release check, and the Node.js download |
+| `tar` (with `xz` on Linux), `sha256sum` or `shasum` | Unpacking and checking downloads |
 | `bubblewrap`, `socat`, `ripgrep` | The sandbox on Linux |
-| `launchctl` (macOS), `systemctl` and `journalctl` (Linux) | The user service |
+| `launchctl` (macOS), `systemctl`, `journalctl` and `loginctl` (Linux) | The user service |
+| `osascript`, `caffeinate`, `open` (macOS) | Lane notifications, keeping the Mac awake during runs, opening `actuo login`'s page |
 | Your project's package manager (npm, pnpm, yarn, bun) | The lane's setup and checks |
 
 ## What actuo fetches by itself
 
-- **Node.js**, from nodejs.org, and **the adapters and the sandbox**, from the npm registry: by `actuo agents install`, and when a session or `actuo login` needs one that isn't installed yet.
+- **Node.js**, from nodejs.org, and **the adapters and the sandbox**, from the npm registry: by `actuo agents install`, and when a session, a lane run, a check run or `actuo login` needs one that isn't installed yet. Node also when `actuo serve` probes an agent in use.
 - **The latest release's version**, from actuo's GitHub releases (Ourfires/actuo): when `actuo serve` starts and once a day after. `actuo status` shows when a newer release is out. Nothing is installed until you run `actuo update`.
-- **Agent options.** For each pinned agent in use, actuo starts the agent once per version, without a prompt, to learn which models and options it offers (`actuo agents probe`). No tokens are spent.
+- **Agent options.** For each pinned agent in use, actuo starts the agent once per version, and again when a session shows options that differ from the last probe (at most every 10 minutes), without a prompt, to learn which models and options it offers (`actuo agents probe`). No tokens are spent. It runs sandboxed with the lane's login if `lane.enabled` is on and a project whose lane is on uses that agent; otherwise with your own login.
 
 The agents themselves reach their providers' APIs, with your account. Lane runs turn off the agents' own telemetry (`lane.telemetry = false`) and their web tools (`lane.web_tools = false`). Sessions you start by hand run with the agent's own defaults.
 
