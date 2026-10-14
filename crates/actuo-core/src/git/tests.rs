@@ -426,3 +426,60 @@ fn repair_worktree_undoes_a_rewritten_git_file() {
     assert!(!marker.exists(), "the filter ran: escape");
     assert_eq!(common_dir(&wt).unwrap(), common_dir(&clone).unwrap());
 }
+
+/// The agent rewrites `.git` and plants a filter; actuo's own git in that worktree
+/// (the checkpoint taken at the end of every turn, a plain `git add`) runs with the
+/// git dir it resolved from the repo, so the filter never runs and nothing reads
+/// the rewritten `.git`. No repair needed first, so no window to race.
+#[test]
+fn a_rewritten_git_file_is_never_read() {
+    let (_d, clone) = repo();
+    let wt = clone.parent().unwrap().join("wt2");
+    worktree_add(&clone, &wt, "work2", "main").unwrap();
+
+    let evil = wt.join(".evil");
+    std::fs::create_dir(&evil).unwrap();
+    run(&evil, &["init", "-q", "--bare", "."]);
+    run(&evil, &["config", "core.bare", "false"]);
+    let marker = clone.parent().unwrap().join("ESCAPED2");
+    run(
+        &evil,
+        &[
+            "config",
+            "filter.pwn.clean",
+            &format!("sh -c 'touch {}; cat'", marker.display()),
+        ],
+    );
+    std::fs::write(wt.join(".gitattributes"), "* filter=pwn\n").unwrap();
+    std::fs::write(wt.join(".git"), format!("gitdir: {}\n", evil.display())).unwrap();
+    std::fs::write(wt.join("app.txt"), "payload\n").unwrap();
+
+    capture_checkpoint(&wt, "refs/actuo/checkpoints/s/1").unwrap();
+    git(&wt, ["add", "--all", "--", ":/"], &[]).unwrap();
+    assert!(!marker.exists(), "the filter ran: escape");
+    assert_eq!(common_dir(&wt).unwrap(), common_dir(&clone).unwrap());
+    // The checkpoint landed in the real repo, not the agent's.
+    run(
+        &clone,
+        &["rev-parse", "--verify", "refs/actuo/checkpoints/s/1"],
+    );
+}
+
+/// A worktree in actuo's worktrees folder that was never resolved is refused,
+/// rather than trusted through its own `.git`.
+#[test]
+fn an_unresolved_worktree_is_refused() {
+    let (_d, clone) = repo();
+    let root = clone.parent().unwrap().join("worktrees");
+    add_worktrees_root(&root);
+    let wt = root.join("s");
+    // Added with plain git, so actuo never resolved it.
+    run(
+        &clone,
+        &["worktree", "add", "-q", "-b", "work3", wt.to_str().unwrap()],
+    );
+    let e = git(&wt, ["status"], &[]).unwrap_err().to_string();
+    assert!(e.contains("isn't resolved"), "{e}");
+    trust_worktree(&clone, &wt).unwrap();
+    git(&wt, ["status"], &[]).unwrap();
+}

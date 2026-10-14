@@ -62,6 +62,92 @@ where
     git_with_stdin(cwd, args, env, None)
 }
 
+/// Worktrees actuo made, each with its git dir as the repo records it.
+static TRUSTED: std::sync::Mutex<Vec<(PathBuf, PathBuf)>> = std::sync::Mutex::new(Vec::new());
+/// Folders actuo makes worktrees in (`<actuo home>/worktrees`).
+static ROOTS: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+/// Marks `root` as a folder of actuo's worktrees: git in a worktree there runs only
+/// once [`trust_worktree`] has resolved it, never from the worktree's own `.git`.
+pub fn add_worktrees_root(root: &Path) {
+    let _ = std::fs::create_dir_all(root);
+    let root = std::fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+    let mut roots = ROOTS.lock().unwrap();
+    if !roots.contains(&root) {
+        roots.push(root);
+    }
+}
+
+/// Resolves `worktree`'s git dir from `repo` (the repo it was added from):
+/// `<repo's git dir>/worktrees/<name>`, whose `gitdir` file points back at it. Those
+/// files are the repo's, which the agent can't write; the worktree's own `.git`
+/// file, which it can, isn't read. From then on actuo runs git in that worktree
+/// with `GIT_DIR` and `GIT_WORK_TREE` set to these, so a rewritten `.git` can't
+/// send it to a config or objects the agent controls, with no window to race.
+pub fn trust_worktree(repo: &Path, worktree: &Path) -> Result<()> {
+    let wt = std::fs::canonicalize(worktree)?;
+    let common = absolute(
+        repo,
+        git(repo, ["rev-parse", "--git-common-dir"], &[])?.trim(),
+    );
+    let mut found = None;
+    for entry in std::fs::read_dir(common.join("worktrees"))?.flatten() {
+        let Ok(back) = std::fs::read_to_string(entry.path().join("gitdir")) else {
+            continue;
+        };
+        let back = PathBuf::from(back.trim());
+        let points_here = back
+            .parent()
+            .and_then(|p| std::fs::canonicalize(p).ok())
+            .is_some_and(|p| p == wt);
+        if points_here {
+            found = Some(entry.path());
+            break;
+        }
+    }
+    let Some(gitdir) = found else {
+        return Err(GitError::Other(format!(
+            "{} has no git dir in {}",
+            wt.display(),
+            common.display()
+        )));
+    };
+    let mut trusted = TRUSTED.lock().unwrap();
+    trusted.retain(|(w, _)| *w != wt);
+    trusted.push((wt, gitdir));
+    Ok(())
+}
+
+/// Forgets `worktree` (it's being removed).
+fn untrust_worktree(worktree: &Path) {
+    let wt = std::fs::canonicalize(worktree).unwrap_or_else(|_| worktree.to_path_buf());
+    TRUSTED.lock().unwrap().retain(|(w, _)| *w != wt);
+}
+
+/// The `GIT_DIR` and `GIT_WORK_TREE` for git in `cwd`: those [`trust_worktree`]
+/// resolved when `cwd` is in one of actuo's worktrees, `None` outside them, and an
+/// error for a worktree in actuo's folders it hasn't resolved.
+fn trusted_dirs(cwd: &Path) -> Result<Option<(PathBuf, PathBuf)>> {
+    let Ok(cwd) = std::fs::canonicalize(cwd) else {
+        return Ok(None);
+    };
+    if let Some((wt, gitdir)) = TRUSTED
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(wt, _)| cwd.starts_with(wt))
+    {
+        return Ok(Some((gitdir.clone(), wt.clone())));
+    }
+    if ROOTS.lock().unwrap().iter().any(|r| cwd.starts_with(r)) {
+        return Err(GitError::Other(format!(
+            "{} is one of actuo's worktrees but its git dir isn't resolved; not reading its .git",
+            cwd.display()
+        )));
+    }
+    Ok(None)
+}
+
 /// Runs git in `cwd` with `stdin` (a commit message, say) and returns stdout.
 pub(crate) fn git_with_stdin<I, S>(
     cwd: &Path,
@@ -85,6 +171,9 @@ where
         .env_remove("GIT_INDEX_FILE")
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("LC_ALL", "C");
+    if let Some((gitdir, worktree)) = trusted_dirs(cwd)? {
+        cmd.env("GIT_DIR", gitdir).env("GIT_WORK_TREE", worktree);
+    }
     for (k, v) in env {
         cmd.env(k, v);
     }
@@ -159,7 +248,7 @@ pub fn worktree_add(repo: &Path, path: &Path, branch: &str, base: &str) -> Resul
         ],
         &[],
     )?;
-    Ok(())
+    trust_worktree(repo, path)
 }
 
 /// `git worktree add <path> <branch>`: a worktree for a branch that exists.
@@ -178,7 +267,7 @@ pub fn worktree_add_existing(repo: &Path, path: &Path, branch: &str) -> Result<(
         ],
         &[],
     )?;
-    Ok(())
+    trust_worktree(repo, path)
 }
 
 /// The worktree (the main one included) that has `branch` checked out, canonicalized.
@@ -218,6 +307,7 @@ pub fn repair_worktree(clone: &Path, worktree: &Path) -> Result<()> {
         ["worktree", "repair", &worktree.to_string_lossy()],
         &[],
     )?;
+    trust_worktree(clone, worktree)?;
     let want = common_dir(clone)?;
     let got = common_dir(worktree)?;
     let same = match (got.canonicalize(), want.canonicalize()) {
@@ -236,6 +326,7 @@ pub fn repair_worktree(clone: &Path, worktree: &Path) -> Result<()> {
 
 /// Removes a worktree and its git metadata, with any changes in it.
 pub fn worktree_remove(repo: &Path, path: &Path) -> Result<()> {
+    untrust_worktree(path);
     let path = path.to_string_lossy();
     git(repo, ["worktree", "remove", "--force", &*path], &[]).map(|_| ())
 }

@@ -91,6 +91,7 @@ impl Host {
         settings: Settings,
         backend: Arc<dyn AgentBackend>,
     ) -> Arc<Self> {
+        trust_worktrees(&store, &paths);
         Arc::new(Self {
             store,
             paths,
@@ -2076,5 +2077,30 @@ async fn sleep_until(at: Option<tokio::time::Instant>) {
     match at {
         Some(at) => tokio::time::sleep_until(at).await,
         None => std::future::pending().await,
+    }
+}
+
+/// Marks actuo's worktrees folder and resolves the git dir of every stored
+/// session's worktree from its project's repo ([`git::trust_worktree`]), so git
+/// actuo runs in a worktree after a restart never reads the worktree's own `.git`.
+/// A worktree that's gone is skipped.
+fn trust_worktrees(store: &Store, paths: &Paths) {
+    git::add_worktrees_root(&paths.home.join("worktrees"));
+    let Ok(sessions) = store.sessions(None) else {
+        return;
+    };
+    for s in sessions {
+        let Some(wt) = s.worktree_path.as_deref() else {
+            continue;
+        };
+        let wt = std::path::Path::new(wt);
+        if !wt.exists() {
+            continue;
+        }
+        if let Ok(project) = store.project(&s.project_id)
+            && let Err(e) = git::trust_worktree(std::path::Path::new(&project.root), wt)
+        {
+            crate::log!("{}: {e}", s.id);
+        }
     }
 }
