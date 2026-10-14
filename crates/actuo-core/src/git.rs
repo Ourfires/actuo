@@ -27,6 +27,8 @@ pub enum GitError {
     },
     #[error("{0} is not inside a git repository")]
     NotARepo(PathBuf),
+    #[error("{0}")]
+    Other(String),
 }
 
 pub type Result<T, E = GitError> = std::result::Result<T, E>;
@@ -202,6 +204,34 @@ pub fn worktree_for_branch(repo: &Path, branch: &str) -> Result<Option<PathBuf>>
 pub fn common_dir(cwd: &Path) -> Result<PathBuf> {
     let out = git(cwd, ["rev-parse", "--git-common-dir"], &[])?;
     Ok(absolute(cwd, out.trim()))
+}
+
+/// Restores a linked worktree's `.git` file from the clone's own trusted
+/// back-reference (`<clone>/.git/worktrees/<name>/gitdir`), undoing any change made
+/// to it, then confirms it points back under the clone. A lane agent can write its
+/// worktree, `.git` included; git would otherwise follow that file to a git dir the
+/// agent controls (filter and ssh config, another repo's objects), so actuo runs
+/// `git worktree repair` from the clone before it runs git on the worktree itself.
+pub fn repair_worktree(clone: &Path, worktree: &Path) -> Result<()> {
+    git(
+        clone,
+        ["worktree", "repair", &worktree.to_string_lossy()],
+        &[],
+    )?;
+    let want = common_dir(clone)?;
+    let got = common_dir(worktree)?;
+    let same = match (got.canonicalize(), want.canonicalize()) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => got == want,
+    };
+    if !same {
+        return Err(GitError::Other(format!(
+            "{} is not linked to {} after repair (its .git may be tampered)",
+            worktree.display(),
+            clone.display()
+        )));
+    }
+    Ok(())
 }
 
 /// Removes a worktree and its git metadata, with any changes in it.

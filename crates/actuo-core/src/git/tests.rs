@@ -388,3 +388,41 @@ fn a_long_patch_is_cut_at_a_line_end() {
     assert_eq!(d.files.len(), 1);
     assert_eq!(d.files[0].0.added as usize, DIFF_PATCH_LIMIT / 100 + 10);
 }
+
+/// A lane agent can write its worktree's `.git` file. `repair_worktree` restores
+/// it from the clone, so git actuo runs on the worktree can't be sent to a config
+/// the agent controls (filter drivers, another repo's objects).
+#[test]
+fn repair_worktree_undoes_a_rewritten_git_file() {
+    let (_d, clone) = repo();
+    let wt = clone.parent().unwrap().join("wt");
+    worktree_add(&clone, &wt, "work", "main").unwrap();
+    let real = std::fs::read_to_string(wt.join(".git")).unwrap();
+
+    // The agent points .git at a git dir of its own with a clean filter, and adds
+    // attributes that would run it on `git add`.
+    let evil = wt.join(".evil");
+    std::fs::create_dir(&evil).unwrap();
+    run(&evil, &["init", "-q", "--bare", "."]);
+    run(&evil, &["config", "core.bare", "false"]);
+    let marker = clone.parent().unwrap().join("ESCAPED");
+    run(
+        &evil,
+        &[
+            "config",
+            "filter.pwn.clean",
+            &format!("sh -c 'touch {}; cat'", marker.display()),
+        ],
+    );
+    std::fs::write(wt.join(".gitattributes"), "* filter=pwn\n").unwrap();
+    std::fs::write(wt.join(".git"), format!("gitdir: {}\n", evil.display())).unwrap();
+    std::fs::write(wt.join("app.txt"), "payload\n").unwrap();
+
+    repair_worktree(&clone, &wt).unwrap();
+    assert_eq!(std::fs::read_to_string(wt.join(".git")).unwrap(), real);
+
+    // actuo's stage, as `lane::git::stage` runs it, no longer triggers the filter.
+    git(&wt, ["add", "--all", "--", ":/"], &[]).unwrap();
+    assert!(!marker.exists(), "the filter ran: escape");
+    assert_eq!(common_dir(&wt).unwrap(), common_dir(&clone).unwrap());
+}
