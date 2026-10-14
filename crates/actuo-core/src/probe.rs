@@ -97,7 +97,16 @@ pub async fn probe(host: &Arc<Host>, agent: &str) -> HostResult<AgentOptions> {
             Ok(Ok(found)) => Ok(found),
             Ok(Err(e)) => {
                 let e = setup_error(e);
-                Err(RpcError::new(e.0, e.1))
+                let message = if e.0 == ErrorKind::AuthRequired {
+                    format!(
+                        "{}: {}",
+                        e.1,
+                        crate::session::login_hint(agent, sandbox.is_some())
+                    )
+                } else {
+                    e.1
+                };
+                Err(RpcError::new(e.0, message))
             }
             Err(_) => Err(RpcError::new(
                 ErrorKind::AgentError,

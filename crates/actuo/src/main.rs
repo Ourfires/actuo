@@ -56,7 +56,7 @@ use actuo_protocol::events::{Event, EventBody};
 use actuo_protocol::ids::{PermissionOptionId, RequestId, SessionId};
 use actuo_protocol::methods::*;
 use actuo_protocol::types::{
-    AgentConfigOption, ConfigValue, Level, PermissionOption, SessionSummary,
+    AgentConfigOption, ConfigValue, Level, PermissionOption, SessionState, SessionSummary,
 };
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
@@ -581,6 +581,8 @@ async fn run(cli: Cli) -> Result<()> {
             out!("{}", started.session_id);
             if attach {
                 attach_to(&client, events, started.session_id, 0).await?;
+            } else {
+                wait_ready(&client, events, started.session_id).await?;
             }
         }
         Cmd::Sessions { json } => {
@@ -1739,6 +1741,44 @@ fn parse_config(items: &[String]) -> Result<BTreeMap<String, ConfigValue>> {
             Ok((k.to_string(), v))
         })
         .collect()
+}
+
+/// Waits until a new session's agent is ready (idle, or its first turn running),
+/// saying on stderr what setup is doing (installing Node or the adapter); fails
+/// with the reason when setup fails.
+async fn wait_ready(
+    client: &Client,
+    mut events: tokio::sync::mpsc::UnboundedReceiver<Event>,
+    id: SessionId,
+) -> Result<()> {
+    client
+        .call::<SessionSubscribe>(SessionSubscribeParams {
+            session_id: id.clone(),
+            from_seq: 0,
+            include_raw: false,
+        })
+        .await?;
+    while let Some(event) = events.recv().await {
+        let EventBody::SessionState(d) = &event.body else {
+            continue;
+        };
+        if event.session_id != id {
+            continue;
+        }
+        match d.state {
+            SessionState::Starting => {
+                if let Some(r) = &d.reason {
+                    eprintln!("starting: {r}");
+                }
+            }
+            SessionState::Idle | SessionState::Running => return Ok(()),
+            SessionState::Ended | SessionState::Detached => bail!(
+                "the session didn't start: {}",
+                d.reason.as_deref().unwrap_or("its agent stopped")
+            ),
+        }
+    }
+    bail!("actuo closed the connection")
 }
 
 async fn attach_to(

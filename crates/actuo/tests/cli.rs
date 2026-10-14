@@ -31,7 +31,7 @@ fn commands() {
     let mut env = Env::new(&script());
     assert!(
         env.fails(&["sessions"])
-            .contains("is `actuo serve` running?")
+            .contains("start it with `actuo service install`")
     );
     env.start_actuo();
 
@@ -549,4 +549,26 @@ fn settings_edit() {
     // Saved unchanged: nothing to do.
     let out = edit("", &["[lane]\nmax_runs = 4\n"]);
     assert_eq!(String::from_utf8_lossy(&out.stdout), "no change\n");
+}
+
+/// `actuo start` waits for the agent. One that needs a login makes it fail with the
+/// command that logs that agent in (here a stand-in named `claude`); one that
+/// starts returns once it's ready.
+#[test]
+fn start_waits_for_the_agent_and_names_the_login() {
+    let mut env = Env::with_agents(&[
+        ("claude", json!({"authRequired": true, "turns": []})),
+        ("fake", script()),
+    ]);
+    env.start_actuo();
+    let repo = env.repo.to_str().unwrap().to_string();
+    let e = env.fails(&["start", &repo, "--agent", "claude"]);
+    assert!(
+        e.contains("the session didn't start: the agent needs a login")
+            && e.contains("`claude auth login`"),
+        "{e}"
+    );
+    let id = env.ok(&["start", &repo, "--agent", "fake"]);
+    let shown: Value = serde_json::from_str(&env.ok(&["show", id.trim()])).unwrap();
+    assert_eq!(shown["state"], "idle", "{shown}");
 }
