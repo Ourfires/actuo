@@ -184,6 +184,7 @@ An entry merges over the built-in one of the same name: tables merge key by key,
 - [docs/lane.md](docs/lane.md): the issue-to-PR lane in depth.
 - [docs/security.md](docs/security.md): the security model.
 - [docs/third-party.md](docs/third-party.md): what actuo downloads and runs, and under which terms.
+- [CHANGELOG.md](CHANGELOG.md): what changed in each release.
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## License

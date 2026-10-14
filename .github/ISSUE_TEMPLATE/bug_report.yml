@@ -1,0 +1,66 @@
+name: Bug report
+description: Something in actuo doesn't work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a security problem, don't open an issue: [report it privately](https://github.com/Ourfires/actuo/security/advisories/new).
+        Before you paste logs, remove tokens, keys and anything from a private repo.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. actuo start ~/code/my-app --prompt "..."
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: actuo version
+      description: The output of `actuo --version`.
+      placeholder: actuo 0.1.0 (e0a9414)
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple Silicon)
+        - Linux x86_64
+        - Linux arm64
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - A session (actuo start, attach, send)
+        - The issue-to-PR lane
+        - Install, update or the service
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      description: The agent involved, if any, and its version from `actuo agents`.
+      placeholder: claude 0.84.0
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The relevant lines from `~/.actuo/logs/serve.log` (macOS) or `journalctl --user -u actuo` (Linux), and `actuo status`.
+      render: text

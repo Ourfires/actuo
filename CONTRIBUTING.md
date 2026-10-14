@@ -61,6 +61,7 @@ A setting's help is its doc comment: `actuo settings keys` prints it.
 ## Conventions
 
 - Keep changes small, one step at a time, each with a clear commit message.
+- A change users will notice gets a line in [CHANGELOG.md](CHANGELOG.md) under "Unreleased".
 - Agents run as child processes and speak ACP v1 over stdio, through the `agent-client-protocol` crate. Actuo doesn't contain an agent loop.
 - Shell out to `git` and `gh`; no libgit2.
 - A crashed agent ends its session with an error; it never takes actuo down.
