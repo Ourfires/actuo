@@ -1053,6 +1053,14 @@ async fn sandboxed(
         let tmp = crate::sandbox::temp_dir(&paths, &name).map_err(|e| e.to_string())?;
         let git = crate::sandbox::gitconfig(&paths).map_err(|e| e.to_string())?;
         let common = git::common_dir(&cwd).map_err(|e| e.to_string())?;
+        // A real git dir is never inside the working tree; a `.git` file the agent
+        // rewrote to point inside it would be.
+        if common.starts_with(&cwd) {
+            return Err(format!(
+                "{}'s .git points inside the worktree",
+                cwd.display()
+            ));
+        }
         let mut read = vec![
             cwd.clone(),
             common,

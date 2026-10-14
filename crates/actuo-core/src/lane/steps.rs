@@ -86,7 +86,8 @@ pub fn sandbox_for(
     use std::path::PathBuf;
     let tmp = crate::sandbox::temp_dir(paths, name).map_err(|e| e.to_string())?;
     let git = crate::sandbox::gitconfig(paths).map_err(|e| e.to_string())?;
-    let common = crate::git::common_dir(worktree).map_err(|e| e.to_string())?;
+    // From the clone, not the worktree: the worktree's `.git` is agent-writable.
+    let common = crate::git::common_dir(&paths.lane_clone(repo)).map_err(|e| e.to_string())?;
     let store = paths.home.join("stores").join(repo);
     std::fs::create_dir_all(&store).map_err(|e| e.to_string())?;
     let mut r = vec![

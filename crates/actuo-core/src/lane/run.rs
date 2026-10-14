@@ -583,6 +583,9 @@ impl RunTask {
     /// one more turn before the run finishes.
     async fn finish_from(&mut self, mut from: From) -> Step {
         loop {
+            // After the turn (or review/comments turn) that led here; before any
+            // git actuo runs on the worktree.
+            self.harden_worktree().await?;
             if from <= From::Turn {
                 self.no_changes_guard().await?;
             }
@@ -602,6 +605,9 @@ impl RunTask {
             if self.needs_agent_subject().await && self.review(failing.as_ref()).await? {
                 failing = self.check_rounds().await?;
             }
+            // The review or subject turns above may have run; re-harden before the
+            // guards read the worktree and the commit stages it.
+            self.harden_worktree().await?;
             if !self.skip_guards {
                 self.guards().await?;
             }
@@ -1858,7 +1864,7 @@ impl RunTask {
         match self.lane.host.db(move |st| st.session(&sid)).await {
             Ok(s) => {
                 self.worktree = PathBuf::from(s.cwd);
-                Ok(())
+                self.harden_worktree().await
             }
             Err(e) => Err(self.fail("agent_error", &e.message).await),
         }
@@ -1875,9 +1881,26 @@ impl RunTask {
         self.save().await;
     }
 
+    /// Restores the worktree's `.git` link from the clone (`git worktree repair`)
+    /// before actuo runs git on the worktree, so a `.git` file the agent rewrote
+    /// can't send git to a config or objects the agent controls. Runs between turns,
+    /// with no agent writing the worktree.
+    async fn harden_worktree(&mut self) -> Step {
+        if self.worktree.as_os_str().is_empty() || !self.worktree.exists() {
+            return Ok(());
+        }
+        let clone = self.lane.host.paths().lane_clone(&self.run.repo);
+        let wt = self.worktree.clone();
+        match blocking(move || crate::git::repair_worktree(&clone, &wt)).await {
+            Ok(()) => Ok(()),
+            Err(e) => Err(self.fail("git_error", &e.to_string()).await),
+        }
+    }
+
     /// Someone may have pushed to the PR branch: fast-forward to it. Never a rebase;
     /// a branch that went another way pauses the run.
     async fn fast_forward(&mut self) -> Step {
+        self.harden_worktree().await?;
         let (wt, branch) = (self.worktree.clone(), self.run.branch.clone());
         match blocking(move || lane_git::fast_forward(&wt, &branch)).await {
             Ok(lane_git::FastForward::Diverged) => Err(self
