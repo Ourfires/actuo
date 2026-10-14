@@ -6,7 +6,7 @@ You need:
 
 - Rust. The toolchain is pinned in `rust-toolchain.toml`; `rustup` installs it, with `rustfmt` and `clippy`, the first time you build.
 - `git` on `PATH`.
-- Node.js, for one test only (`crates/actuo-core/tests/srt_records.rs` runs the sandbox's records preload with real Node). Actuo itself downloads its own pinned Node; the tests use a stand-in for it and never download it.
+- Node.js, for one test file only (`crates/actuo-core/tests/srt_records.rs` runs the sandbox's records preload and the local-ports wrapper, `check-local-network.cjs`, with real Node). Actuo itself downloads its own pinned Node; the tests use a stand-in for it and never download it.
 
 ```bash
 cargo build
@@ -66,7 +66,7 @@ A setting's help is its doc comment: `actuo settings keys` prints it.
 - A crashed agent ends its session with an error; it never takes actuo down.
 - Events are written to the store before they are sent to anyone.
 - Nothing secret goes into the code, logs or events.
-- Pin the versions of agent adapters and sandbox-runtime, and check their current releases before changing a pin.
+- Pin the versions of agent adapters, sandbox-runtime and Node.js (`crates/actuo-core/src/node.rs`), and check their current releases before changing a pin.
 - Packages are named `actuo-*` (and the test stand-ins `fake-*`). Never name one `core`: it shadows Rust's `core` crate.
 
 ## License

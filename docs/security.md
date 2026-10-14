@@ -13,7 +13,7 @@ Actuo belongs to the user that runs it. The install script refuses to run as roo
 
 ## Sessions you start by hand
 
-A session from `actuo start` works in its own git worktree under `~/.actuo/worktrees`, so it doesn't change the files in your checkout. A worktree is not a sandbox: the agent runs with your user's permissions, your environment, its own login and its own config. What it may do without asking is the session's level (`ask` by default) and the agent's own permission prompts, which you answer.
+A session from `actuo start` works in its own git worktree under `~/.actuo/worktrees`, so it doesn't change the files in your checkout (unless you pass `--no-worktree`, which runs it in your checkout). A worktree is not a sandbox: the agent runs with your user's permissions, your environment, its own login and its own config. What it may do without asking is the session's level (`ask` by default) and the agent's own permission prompts, which you answer.
 
 Lane rules that allow a request apply only inside the sandbox. A session without the sandbox never has its requests allowed by a rule.
 
@@ -34,16 +34,16 @@ What each process may read, write and reach:
 
 | | Reads | Writes | Reaches |
 | --- | --- | --- | --- |
-| Agent session | its worktree, the repo's git folder, the installed adapters and actuo's Node, the project's `read` list | its worktree, its temp folder, its own config folder under `~/.actuo/agent-homes` | its model API hosts; the package registries in the project's `network` (all of `network` with `agent_network`) |
+| Agent session | its worktree, the repo's git folder, the installed adapters and actuo's Node, its temp and config folders, the project's `read` list and the agent's `sandbox.read` | its worktree, its temp folder, its own config folder under `~/.actuo/agent-homes` | its model API and login-refresh hosts; the npm and yarn registries in the project's `network` (all of `network` with `agent_network`) |
 | Setup | its worktree, the repo's git folder, the project's package store, the project's `read` list; `~/.npmrc` only with the project's `setup_reads_npmrc` | its worktree, its temp folder, the package store (`~/.actuo/stores/<owner>/<repo>`) | the project's `network` |
 | Checks, commit check | its worktree, the repo's git folder, the package store, the project's `read` list | its worktree, its temp folder | nothing; on macOS, the loopback ports in `checks_local_ports` and `checks_local_listen_ports` (see below) |
 | `actuo login <agent>` | the installed adapters and actuo's Node | the agent's config folder under `~/.actuo/agent-homes`, a temp folder | the agent's login hosts; it may listen on localhost for an OAuth callback |
 
 On macOS, the sandbox can't keep `checks_local_listen_ports` to loopback: while a check listens on one of those ports, other machines on the network can reach it too. Set them only for tests you trust, on a network you trust.
 
-The agent can read the repo's git folder but not write it: it can't commit or push. Actuo commits and pushes from outside the sandbox, after its checks.
+The agent can read the repo's git folder but not write it: it can't commit or push. Actuo commits and pushes from outside the sandbox, after its checks. The agent can write its own worktree, including the small `.git` file that points git at the repo. Actuo never reads that file: it finds each worktree's git folder from the repo the worktree was made from (files the agent can't write) and runs all its own git there with `GIT_DIR` and `GIT_WORK_TREE` set, so a rewritten `.git` can't send actuo's git (the checkpoint after each turn, diffs, reverts, the commit and push) to a config or objects the agent controls. Git in one of actuo's worktrees that it hasn't resolved this way is refused.
 
-A project's `read` list (and an agent's `sandbox.read` in `agents.toml`) must be absolute or start with `~/`. It can't be your whole home folder, actuo's home, or one of the credential paths above, or contain or sit inside one.
+A project's `read` list (and an agent's `sandbox.read` in `agents.toml`) must be absolute or start with `~/`, and can't contain `..`. It can't be your home folder or a folder above it, actuo's home, or one of the credential paths above, or contain or sit inside one.
 
 By default, lane runs also turn off the agent's web search and fetch tools (`lane.web_tools = false`) and its own telemetry (`lane.telemetry = false`).
 
@@ -61,15 +61,15 @@ Some files steer agents or CI: `.github/`, `.claude/`, `.codex/`, `.mcp.json`, `
 
 ## Nothing secret is published
 
-Before any commit, push, comment or PR, actuo scans the text for credential formats: Anthropic keys and tokens, OpenAI API keys, GitHub tokens, npm tokens, JWTs, Codex refresh tokens, private keys, and any value it passes to an agent from its environment. For a commit it scans the added lines, the new file names, every commit message not yet on `origin`, and its own message.
+Before any commit, push, comment or PR, actuo scans the text for credential formats: Anthropic keys and tokens, OpenAI API keys, GitHub tokens, npm tokens, JWTs, Codex refresh tokens, private keys, and any value of 16 characters or more that it passes to an agent from its environment. For a commit it scans the added lines, the new file names, every commit message not yet on `origin`, and its own message.
 
-If it finds one, nothing from that step is published. The run waits (`secret_detected`). The issue comment says where the text was and which format it matched, never the text.
+If it finds one, nothing from that step is published. The run waits (`secret_detected`); a status comment with one is just not posted. The issue comment says where the text was and which format it matched, never the text.
 
 ## Agent text on GitHub
 
 Text from the agent (the PR description, quoted messages) is made inert before it is posted:
 
-- links show their target in a code span, so no link hides where it goes;
+- links show their target in a code span (a bare URL or `<url>` link already shows it and stays as it is), so no link hides where it goes;
 - images become `[image: <alt>] <url>` in code spans, so nothing is fetched;
 - raw HTML is shown as code, not rendered;
 - `@user` and `@org/team` mentions go in code spans and notify no one;
@@ -90,6 +90,16 @@ Anyone who can write on an issue can try to steer the agent. Actuo:
 - counts only trusted users' labels and comments: a trigger label added by anyone else is skipped, and comments by anyone else never reach the agent. The issue's own title and text go to the agent whoever wrote them: adding the label is what lets them through, so read the issue before you label it.
 
 None of this stops prompt injection. What limits the damage is the sandbox, the missing credentials, the approval rules, the protected paths and size limits, the scan before publishing, and the draft PR, which a person reviews and merges. Actuo never merges; it pushes only its own `actuo/issue-<n>` branches, with git hooks skipped.
+
+## What the sandbox doesn't cover
+
+The sandbox limits lane runs; it isn't a complete boundary. Know these before you rely on it:
+
+- **Reads outside your home folder aren't restricted.** The sandbox denies your home folder and the credential paths above; `/etc`, `/opt`, `/tmp`, mounted volumes and anything else world-readable stay readable. If `ACTUO_HOME` is outside your home folder, actuo's logs, database and settings there are readable too.
+- **Tokens you give actuo reach the agent's sandbox.** A `pass_env` value (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`) is in the agent's environment, visible to the agent and every command it runs. The scan before publishing is what keeps it off GitHub.
+- **Installs run outside the sandbox.** Actuo installs the adapters and `srt` with `npm install` under your user, with your environment and `~/.npmrc`; their dependencies resolve at install time. Actuo's own Node is checked against a sha256 pinned in actuo. Actuo's binary is checked against a `.sha256` from the same release: that proves the download is intact, not who made it.
+- **Actuo starts agents unprompted** to learn their options (`actuo agents probe`): at `actuo serve` start and after a settings change, for an agent in use whose pinned version hasn't been probed, and when a session shows options the last probe didn't (at most every 10 minutes). Unless `lane.enabled` is on and a project whose lane is on uses that agent, that runs outside the sandbox with your own login.
+- **Actuo's commit is yours.** It commits with your git identity and config; with `sign_commits` it signs with your key.
 
 ## Recommended setup for the lane
 
